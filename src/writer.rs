@@ -65,48 +65,36 @@ impl Write for AndroidLogWriter<'_> {
         let priority = self.priority.as_raw() as i32;
         let tag = self.tag.as_ptr();
 
-        #[cfg(feature = "api-30")]
-        {
-            use std::{mem::size_of, ptr::null};
+        use std::{mem::size_of, ptr::null};
 
-            use ndk_sys::{
-                __android_log_is_loggable, __android_log_message, __android_log_write_log_message,
-            };
+        use ndk_sys::{
+            __android_log_is_loggable, __android_log_message, __android_log_write_log_message,
+        };
 
-            if unsafe { __android_log_is_loggable(priority, tag, priority) } == 0 {
-                return Ok(());
-            }
-
-            let (file, line) = match &mut self.location {
-                Some(Location { file, line }) => match file.as_ptr() {
-                    Some(ptr) => (ptr, *line),
-                    None => (null(), 0),
-                },
-                None => (null(), 0),
-            };
-
-            for message in messages {
-                let mut message = __android_log_message {
-                    struct_size: size_of::<__android_log_message>() as u64,
-                    buffer_id: buffer,
-                    priority,
-                    tag,
-                    file,
-                    line,
-                    message,
-                };
-
-                unsafe { __android_log_write_log_message(&mut message) };
-            }
+        if unsafe { __android_log_is_loggable(priority, tag, priority) } == 0 {
+            return Ok(());
         }
 
-        #[cfg(not(feature = "api-30"))]
-        {
-            use ndk_sys::__android_log_buf_write;
+        let (file, line) = match &mut self.location {
+            Some(Location { file, line }) => match file.as_ptr() {
+                Some(ptr) => (ptr, *line),
+                None => (null(), 0),
+            },
+            None => (null(), 0),
+        };
 
-            for message in messages {
-                unsafe { __android_log_buf_write(buffer, priority, tag, message) };
-            }
+        for message in messages {
+            let mut message = __android_log_message {
+                struct_size: size_of::<__android_log_message>() as u64,
+                buffer_id: buffer,
+                priority,
+                tag,
+                file,
+                line,
+                message,
+            };
+
+            unsafe { __android_log_write_log_message(&mut message) };
         }
 
         Ok(())
